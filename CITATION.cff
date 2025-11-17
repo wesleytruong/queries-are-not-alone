@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Queries Are Not Alone"
+type: software
+url: "https://github.com/wesleytruong/queries-are-not-alone"
+preferred-citation:
+  type: article
+  title: "Queries Are Not Alone"
+  year: 2024
+  url: "https://arxiv.org/abs/2510.07720"
+  identifiers:
+    - type: other
+      value: "arXiv:2510.07720"
+      description: "arXiv preprint"
