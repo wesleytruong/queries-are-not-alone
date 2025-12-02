@@ -1,0 +1,15 @@
+out_dir = "data/msrvtt_hf"
+dataset_tag = "msrvtt"
+dataset_name = "friedrichor/MSR-VTT"
+dataset_config = "train_9k"
+split = "train"
+
+num_frames = 8
+resize = 224
+
+video_column = "video"
+caption_column = "caption"
+id_column = "video_id"
+
+video_root = "data/msrvtt_raw/video"
+video_ext = ".mp4"

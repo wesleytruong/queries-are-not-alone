@@ -1,30 +1,45 @@
-# scripts/preprocess_didemo_hf.py
+# scripts/preprocess_dataset.py
 import argparse
 import os
+from pathlib import Path
 from typing import Dict, Any, Iterator, List
+from types import SimpleNamespace
+
+import tomllib
 
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
 from datasets import load_dataset, Video, Dataset, Features, Sequence, Value, Image as HFImage
 
-def sample_equal_frames(video_array: np.ndarray, num_frames: int) -> np.ndarray:
+def sample_equal_frames(video_decoder, num_frames: int) -> np.ndarray:
     """
-    video_array: [T, H, W, C] uint8
-    return: [num_frames, H, W, C] sampled at equal timesteps
+    Sample `num_frames` frames at equal(ish) timesteps from a VideoDecoder.
+
+    Returns: [num_frames, H, W, C] uint8
     """
-    assert video_array.ndim == 4, f"Expected [T,H,W,C], got {video_array.shape}"
-    T = video_array.shape[0]
+
+    # Decode ALL frames in one go: [T, 3, H, W]
+    frames_obj = video_decoder.get_frames_in_range(0, 10**9, 1)
+    frames_tensor = frames_obj.data  # torch.Tensor [T, 3, H, W]
+    T = frames_tensor.shape[0]
+
     if T == 0:
         raise ValueError("Video has zero frames")
 
+    # Compute indices exactly like your original function
     if T >= num_frames:
         idx = np.linspace(0, T - 1, num_frames, dtype=int)
     else:
         idx = np.linspace(0, T - 1, num_frames, dtype=float)
         idx = np.round(idx).astype(int)
 
-    return video_array[idx]
+    # Subsample on the tensor, then go to numpy [F, H, W, C]
+    frames_tensor = frames_tensor[idx]                # [F, 3, H, W]
+    frames_np = frames_tensor.permute(0, 2, 3, 1)     # [F, H, W, C]
+    frames_np = frames_np.cpu().numpy().astype(np.uint8)
+
+    return frames_np
 
 
 def frames_to_pil_list(frames: np.ndarray, resize: int) -> List[Image.Image]:
@@ -32,89 +47,126 @@ def frames_to_pil_list(frames: np.ndarray, resize: int) -> List[Image.Image]:
     frames: [F, H, W, C] uint8
     returns: list of PIL.Image
     """
-    pil_frames: List[Image.Image] = []
+    assert frames.ndim == 4, f"Expected [F,H,W,C], got shape {frames.shape}"
     F = frames.shape[0]
+    pil_frames: List[Image.Image] = []
+
     for i in range(F):
         img = Image.fromarray(frames[i])
         if resize and resize > 0:
             img = img.resize((resize, resize), resample=Image.BICUBIC)
         img = img.convert("RGB")
         pil_frames.append(img)
+
     return pil_frames
 
+DEFAULT_CONFIG: Dict[str, Any] = {
+    "out_dir": "data/msrvtt_hf",
+    "dataset_config": "train_7k",
+    "split": "train",
+    "num_frames": 8,
+    "resize": 224,
+    "dataset_name": "friedrichor/MSR-VTT",
+    "video_column": "video",
+    "caption_column": "caption",
+    "id_column": "video_id",
+    "dataset_tag": "msrvtt",
+    "video_root": "data/msrvtt_raw/video",
+    "video_ext": ".mp4",
+}
+
+
 def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--out-dir",
-        type=str,
-        default="data/didemo_hf",
-        help="Directory where the HF dataset will be saved",
+    parser = argparse.ArgumentParser(
+        description="Convert an HF video-caption dataset into sampled frame sequences."
     )
     parser.add_argument(
-        "--split",
-        type=str,
-        default="train",
-        choices=["train", "val", "test"],
-        help="Which split of DiDeMo to preprocess",
-    )
-    parser.add_argument(
-        "--num-frames",
-        type=int,
-        default=8,
-        help="Number of frames to sample uniformly per video",
-    )
-    parser.add_argument(
-        "--resize",
-        type=int,
-        default=224,
-        help="Resize frames to square [resize x resize]",
-    )
-    parser.add_argument(
-        "--dataset-name",
-        type=str,
-        default="friedrichor/DiDeMo",cat DiDeMo_Videos_mp4_train.tar.part-* | tar -vxf -
-tar -xvf DiDeMo_Videos_mp4_test.tar
-        help="Hugging Face dataset id for DiDeMo",
+        "--config",
+        required=True,
+        help="Path to a TOML config file describing preprocessing options.",
     )
     return parser.parse_args()
 
+
+def load_config(path: str) -> SimpleNamespace:
+    cfg_path = Path(path).expanduser()
+    if not cfg_path.exists():
+        raise FileNotFoundError(f"Config file {cfg_path} does not exist")
+    with cfg_path.open("rb") as f:
+        data = tomllib.load(f)
+    if not isinstance(data, dict):
+        raise ValueError(f"Config file {cfg_path} must contain a TOML table.")
+    merged = dict(DEFAULT_CONFIG)
+    merged.update(data)
+    return SimpleNamespace(**merged)
+
 def main():
     args = parse_args()
-    os.makedirs(args.out_dir, exist_ok=True)
+    cfg = load_config(args.config)
 
-    # Load DiDeMo in streaming mode
+    os.makedirs(cfg.out_dir, exist_ok=True)
+    if not cfg.video_root:
+        raise ValueError("Config must define a 'video_root' directory containing MSRVTT videos.")
+    video_root = Path(cfg.video_root).expanduser()
+    if not video_root.exists():
+        raise FileNotFoundError(f"Video root {video_root} does not exist")
+    normalized_ext = cfg.video_ext if cfg.video_ext.startswith(".") else f".{cfg.video_ext}"
+
+    # Load dataset metadata in streaming mode
     stream_ds = load_dataset(
-        args.dataset_name,
-        split=args.split,
+        cfg.dataset_name,
+        name=cfg.dataset_config,
+        split=cfg.split,
         streaming=True,
     )
-    stream_ds = stream_ds.cast_column("video", Video())
+    video_feature = Video()
 
     # Define HF dataset schema
     features = Features(
         {
-            "video_id": Value("int32"),
+            "video_id": Value("string"),
             "caption": Value("string"),
             "frames": Sequence(HFImage()),  # list of images
         }
     )
 
     def gen() -> Iterator[Dict[str, Any]]:
-        for idx, example in enumerate(tqdm(stream_ds, desc=f"Preprocessing {args.split}")):
-            caption = example["caption"]
-            video_info = example["video"]
-            video_array = video_info["array"]  # [T, H, W, C]
+        for idx, example in enumerate(tqdm(stream_ds, desc=f"Preprocessing {cfg.split}")):
+            caption = example.get(cfg.caption_column)
+            if caption is None:
+                continue
+
+            raw_id = example.get(cfg.id_column)
+            video_id = str(raw_id) if raw_id is not None else str(idx)
+
+            candidates: List[Path] = []
+            filename = example.get(cfg.video_column)
+            if filename:
+                filename_str = str(filename)
+                path = Path(filename_str)
+                if path.is_absolute():
+                    candidates.append(path)
+                else:
+                    candidates.append(video_root / filename_str)
+                    if not filename_str.endswith(normalized_ext):
+                        candidates.append((video_root / filename_str).with_suffix(normalized_ext))
+
+            video_path = next((c for c in candidates if c.exists()), None)
+            if video_path is None:
+                continue
+
+            video_info = video_feature.decode_example({"path": str(video_path), "bytes": None})
 
             try:
-                sampled = sample_equal_frames(video_array, args.num_frames)
+                sampled = sample_equal_frames(video_info, cfg.num_frames)
             except ValueError:
                 # skip broken / empty videos
                 continue
 
-            pil_frames = frames_to_pil_list(sampled, resize=args.resize)
+            pil_frames = frames_to_pil_list(sampled, resize=cfg.resize)
 
             yield {
-                "video_id": idx,
+                "video_id": video_id,
                 "caption": caption,
                 "frames": pil_frames,
             }
@@ -122,7 +174,7 @@ def main():
     # Build an in-memory HF Dataset from generator
     ds = Dataset.from_generator(gen, features=features)
 
-    out_path = os.path.join(args.out_dir, f"didemo_{args.split}")
+    out_path = os.path.join(cfg.out_dir, f"{cfg.dataset_tag}_{cfg.split}")
     ds.save_to_disk(out_path)
     print(f"Saved HF dataset split to: {out_path}")
     print(ds)
@@ -130,4 +182,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
