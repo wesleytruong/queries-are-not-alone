@@ -13,15 +13,14 @@ from datasets import load_from_disk
 import clip
 
 
-# -------------------------------
-#  Dataset + collate
-# -------------------------------
+#  keep track of the index in the entire text corpus
+
 
 class TextCorpusDataset(Dataset):
     """
-    Simple text-only corpus dataset.
-    Each item: {"idx": index_in_corpus, "text": caption_string}
-    Need this so we can sample negatives from the dataset without replacement
+    simple text-only corpus dataset.
+    each item: {"idx": index_in_corpus, "text": caption_string}
+    need this so we can sample negatives from the dataset without replacement
     """
     def __init__(self, texts: List[str]):
         self.texts = texts
@@ -38,22 +37,20 @@ class TextCorpusDataset(Dataset):
 
 def collate_batch(batch):
     """
-    Collate function for DataLoader, can't handle lists of dicts natively
-    Input: list of {"idx": int, "text": str}
-    Output: {"idxs": [..], "texts": [..]}
+    collate function for DataLoader, can't handle lists of dicts natively
+    input: list of {"idx": int, "text": str}
+    output: {"idxs": [..], "texts": [..]}
     """
     idxs = [b["idx"] for b in batch]
     texts = [b["text"] for b in batch]
     return {"idxs": idxs, "texts": texts}
 
 
-# -------------------------------
-#  Loss function
-# -------------------------------
+#  loss function
 
 def cosine_distance(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
     """
-    Cosine distance U(a, b) = 1 - cos(a, b)
+    cosine distance U(a, b) = 1 - cos(a, b)
     a, b: [B, d]
     returns: [B]
     """
@@ -78,17 +75,15 @@ def triplet_loss(anchor: torch.Tensor,
     return loss.mean()
 
 
-# -------------------------------
-#  Data loading from Arrow
-# -------------------------------
+#  data loading from Arrow
 
 def load_captions_from_arrow(hf_path: str) -> List[str]:
     """
-    Load captions from a HuggingFace dataset saved with save_to_disk.
-    Each row has:
+    load captions from a HuggingFace dataset saved with save_to_disk
+    each row has:
       - "caption": either a stringified Python list of captions, or a list[str]
 
-    Returns a flat list of cleaned caption strings.
+    returns a flat list of cleaned caption strings
     """
     ds = load_from_disk(hf_path)
     texts: List[str] = []
@@ -122,19 +117,17 @@ def load_captions_from_arrow(hf_path: str) -> List[str]:
     return texts
 
 
-# -------------------------------
 #  CLIP text encoder wrapper
-# -------------------------------
 
 def encode_texts(model,
                  texts: List[str],
                  device: str,
                  dropout_p: float = 0.0) -> torch.Tensor:
     """
-    Encode a batch of texts with CLIP and optionally apply dropout
-    on the normalized embeddings to simulate Φ_C(x, z).
+    encode a batch of texts with CLIP and optionally apply dropout
+    on the normalized embeddings to simulate Φ_C(x, z)
 
-    Returns: [B, d] tensor of L2-normalized embeddings.
+    returns: [B, d] tensor of L2-normalized embeddings
     """
     tokens = clip.tokenize(texts).to(device)
     feats = model.encode_text(tokens)                 # [B, d]
@@ -146,9 +139,7 @@ def encode_texts(model,
     return feats
 
 
-# -------------------------------
-#  Main training loop
-# -------------------------------
+#  main training loop
 
 def main():
     random.seed(42)
@@ -220,7 +211,6 @@ def main():
         avg_loss = running_loss / len(loader)
         print(f"Epoch {epoch+1}/{num_epochs} - L_C = {avg_loss:.4f}")
 
-    # 3) Save fine-tuned text clusterer (CLIP text encoder weights)
     os.makedirs("checkpoints", exist_ok=True)
     out_path = "checkpoints/text_clusterer_clip.pt"
     torch.save(model.state_dict(), out_path)
