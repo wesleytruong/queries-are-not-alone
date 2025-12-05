@@ -18,6 +18,7 @@ def main() -> None:
         repo_id=REPO_ID,
         filename=ZIP_NAME,
         revision="main",
+        repo_type="dataset",
         local_dir=str(RAW_DIR),
     )
 
