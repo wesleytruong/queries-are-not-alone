@@ -60,7 +60,9 @@ def cosine_distance(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
 def triplet_loss(anchor: torch.Tensor,
                  positive: torch.Tensor,
                  negative: torch.Tensor,
-                 margin: float) -> torch.Tensor:
+                 margin: float,
+                 debug=False, 
+                 batch_idx=None) -> torch.Tensor:
     """
     L_C = max(0, U(a,p) - U(a,n) + margin)
     """
@@ -71,9 +73,19 @@ def triplet_loss(anchor: torch.Tensor,
     # d_pos - d_neg + margin is negative if anchor is closer to positive than negative
     # it is positive if anchor is relatively close to negative 
     # margin is how far apart we want d_pos and d_neg to be; if closer, (d_pos - d_neg + margin) is gonna be positive
-    loss = F.relu(d_pos - d_neg + margin)
-    return loss.mean()
+    raw = d_pos - d_neg + margin
+    loss = F.relu(raw)
 
+    # print the values for debugging every 10 batches
+    if debug and batch_idx is not None and batch_idx % 10 == 0:
+        print(
+            f"[Batch {batch_idx}] "
+            f"d_pos (cos(anchor, pos))={d_pos.mean().item():.4f}, "
+            f"d_neg (cos(anchor, neg))={d_neg.mean().item():.4f}, "
+            f"raw={raw.mean().item():.4f}, "
+            f"loss={loss.mean().item():.4f}"
+        )
+    return loss.mean()
 
 #  data loading from Arrow
 
@@ -176,8 +188,8 @@ def main():
         weight_decay=0.01,
     )
 
-    margin = 0.2
-    num_epochs = 5
+    margin = 0.2 # how far at least apart we want the pos and neg cos dist to be 
+    num_epochs = 1 
 
     for epoch in range(num_epochs):
         running_loss = 0.0
@@ -202,14 +214,17 @@ def main():
 
             negative = encode_texts(model, neg_texts, device)  # t*_q_i
 
-            loss = triplet_loss(anchor, positive, negative, margin=margin)
+            loss = triplet_loss(anchor, positive, negative, margin=margin, 
+            debug=True, batch_idx=batch_idx # rm these later when don't want so many prints
+            )
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             running_loss += loss.item()
-            print (f"Batch number: {batch_idx}, Running loss: {running_loss}")
+            avg_loss = running_loss / (batch_idx + 1)
+            print(f"Batch {batch_idx}, Avg loss: {avg_loss:.6f}")
             batch_idx += 1
 
         avg_loss = running_loss / len(loader)
