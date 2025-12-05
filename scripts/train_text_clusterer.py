@@ -182,6 +182,8 @@ def main():
     for epoch in range(num_epochs):
         running_loss = 0.0
 
+        batch_idx = 0
+
         for batch in loader:
             idxs = batch["idxs"]       # [B]
             texts_batch = batch["texts"]
@@ -207,6 +209,8 @@ def main():
             optimizer.step()
 
             running_loss += loss.item()
+            print (f"Batch number: {batch_idx}, Running loss: {running_loss}")
+            batch_idx += 1
 
         avg_loss = running_loss / len(loader)
         print(f"Epoch {epoch+1}/{num_epochs} - L_C = {avg_loss:.4f}")
