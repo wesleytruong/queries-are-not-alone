@@ -9,3 +9,11 @@ dependencies = [
     "torchcodec>=0.8.1",
     "tqdm>=4.67.1",
 ]
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["utils", "model", "scripts", "config"]
+exclude = ["assets", "checkpoints", "data"]

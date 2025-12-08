@@ -1,4 +1,4 @@
-out_dir = "data/msrvtt_hf"
+out_dir = "assets/datasets/msrvtt_processed"
 dataset_tag = "msrvtt"
 dataset_name = "friedrichor/MSR-VTT"
 dataset_config = "train_9k"
@@ -11,5 +11,5 @@ video_column = "video"
 caption_column = "caption"
 id_column = "video_id"
 
-video_root = "data/msrvtt_raw/video"
+video_root = "assets/datasets/msrvtt_raw/video"
 video_ext = ".mp4"

@@ -8,7 +8,7 @@ from huggingface_hub import hf_hub_download
 
 REPO_ID = "friedrichor/MSR-VTT"
 ZIP_NAME = "MSRVTT_Videos.zip"
-RAW_DIR = Path(__file__).resolve().parent.parent / "data" / "msrvtt_raw"
+RAW_DIR = Path(__file__).resolve().parent.parent / "assets" / "datasets" / "msrvtt_raw"
 RAW_DIR.mkdir(parents=True, exist_ok=True)
 
 
