@@ -43,10 +43,11 @@ class RetrievalModel(nn.Module):
                 f"hidden_dim ({D}) must match CLIP embed dim ({clip_dim}); "
                 "update config or add a projection layer."
             )
+        sweeper_segments = getattr(cfg, "sweeper_num_segments", 4)
 
         self.device = device
 
-        self.sweeper = Sweeper(embed_dim=D)
+        self.sweeper = Sweeper(embed_dim=D, num_segments=sweeper_segments)
         self.vtc_att = VTCAttention(embed_dim=D)
         self.fusion = TextVideoFusion(embed_dim=D)
 

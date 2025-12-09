@@ -25,6 +25,7 @@ class DataConfig:
     joint_use_faiss_gpu: bool = False
     joint_text_batch_size: int = 256
     joint_device: str = "cuda"
+    joint_jaccard_bins: int = 4
 
 @dataclass
 class TrainJointConfig:
@@ -49,6 +50,7 @@ class TrainJointConfig:
     # losses
     temperature_init: float = 0.07
     sweeper_label_smoothing: float = 0.0
+    sweeper_num_segments: int = 4
 
     # paths (you’ll adapt these)
     clip_model_name: str = "ViT-B/16"

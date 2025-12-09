@@ -73,19 +73,22 @@ def tokens_to_set(text: str) -> set[str]:
     return set(text.lower().strip().split())
 
 
-def jaccard_label(a_tokens: set[str], b_tokens: set[str]) -> int:
+def jaccard_label(a_tokens: set[str], b_tokens: set[str], num_buckets: int) -> int:
+    """
+    Bucket Jaccard similarity into num_buckets evenly spaced bins over [0, 1].
+    """
+    if num_buckets < 1:
+        raise ValueError("num_buckets must be >= 1")
     if not a_tokens and not b_tokens:
-        return 3  # highest bin if both empty after tokenization
+        return num_buckets - 1
+
     inter = len(a_tokens & b_tokens)
     union = len(a_tokens | b_tokens)
     sim = inter / union if union else 0.0
-    if sim < 0.25:
-        return 0
-    if sim < 0.5:
-        return 1
-    if sim < 0.75:
-        return 2
-    return 3
+    sim = max(0.0, min(sim, 1.0))
+
+    bucket = int(sim * num_buckets)
+    return min(bucket, num_buckets - 1)
 
 
 def encode_frames(model, preprocess, frames: List, device: torch.device) -> torch.Tensor:
@@ -123,6 +126,7 @@ def main():
     use_faiss_gpu = cfg.joint_use_faiss_gpu
     out_dir = Path(cfg.joint_out_dir)
     text_batch_size = cfg.joint_text_batch_size
+    jaccard_bins = cfg.joint_jaccard_bins
 
     print("Loading preprocessed dataset...")
     base_ds = load_from_disk(os.path.join(cfg.out_dir, f"{cfg.dataset_tag}_{cfg.split}"))
@@ -151,7 +155,10 @@ def main():
 
             cluster_embeds = text_embeds[neighbor_ids].numpy().astype("float32")
 
-            labels = [jaccard_label(token_cache[idx], token_cache[n_id]) for n_id in neighbor_ids]
+            labels = [
+                jaccard_label(token_cache[idx], token_cache[n_id], jaccard_bins)
+                for n_id in neighbor_ids
+            ]
 
             frames = row["frames"]
             video_embeds = encode_frames(text_model, preprocess, frames, device=device).numpy().astype("float32")

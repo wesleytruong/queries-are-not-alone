@@ -81,6 +81,8 @@ def train():
         pin_memory=pin_memory,
     )
 
+    print(f"Loaded joint dataset: {len(dataset)} samples, {len(loader)} steps/epoch at batch_size={cfg.batch_size}")
+
     model = RetrievalModel(cfg).to(device)
     # Force CLIP backbone to run in float32 to avoid mixed-precision dtype issues
     model.clip_model.float()

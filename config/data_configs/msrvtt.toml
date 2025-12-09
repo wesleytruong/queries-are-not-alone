@@ -22,3 +22,4 @@ joint_clip_model = "ViT-B/16"
 joint_use_faiss_gpu = false
 joint_text_batch_size = 256
 joint_device = "cuda"
+joint_jaccard_bins = 4
