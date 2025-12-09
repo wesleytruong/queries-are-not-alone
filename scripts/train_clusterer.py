@@ -1,8 +1,9 @@
 # scripts/train_text_clusterer.py
 
-import os
+import argparse
 import random
-from typing import List
+from pathlib import Path
+from typing import List, Optional
 
 import ast
 import torch
@@ -10,7 +11,16 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from datasets import load_from_disk
-import clip
+try:
+    import clip
+except Exception:
+    import packaging
+    import pkg_resources
+
+    pkg_resources.packaging = packaging
+    import clip
+
+from config import load_clusterer_config
 
 
 #  keep track of the index in the entire text corpus
@@ -89,7 +99,9 @@ def triplet_loss(anchor: torch.Tensor,
 
 #  data loading from Arrow
 
-def load_captions_from_arrow(hf_path: str) -> List[str]:
+def load_captions_from_arrow(
+    hf_path: str, max_captions_per_video: int, max_texts: Optional[int] = None
+) -> List[str]:
     """
     load captions from a HuggingFace dataset saved with save_to_disk
     each row has:
@@ -114,10 +126,9 @@ def load_captions_from_arrow(hf_path: str) -> List[str]:
         else:
             caps = []
 
-        # cap to at most 1 captions per video
-        MAX_CAPS = 1
-        if len(caps) > MAX_CAPS:
-            caps = random.sample(caps, MAX_CAPS)
+        cap_limit = max_captions_per_video if max_captions_per_video and max_captions_per_video > 0 else None
+        if cap_limit and len(caps) > cap_limit:
+            caps = random.sample(caps, cap_limit)
 
         # clean whitespace and filter out empty captions
         for c in caps:
@@ -125,6 +136,9 @@ def load_captions_from_arrow(hf_path: str) -> List[str]:
                 c = c.strip()
                 if c:
                     texts.append(c)
+
+    if max_texts and max_texts > 0 and len(texts) > max_texts:
+        texts = random.sample(texts, max_texts)
 
     return texts
 
@@ -143,7 +157,9 @@ def encode_texts(model,
     """
     tokens = clip.tokenize(texts).to(device)
     feats = model.encode_text(tokens)                 # [B, d]
-    feats = feats / feats.norm(dim=-1, keepdim=True)  # normalize
+    # normalize with small epsilon to avoid div-by-zero
+    norm = feats.norm(dim=-1, keepdim=True).clamp(min=1e-8)
+    feats = feats / norm  # normalize
 
     if dropout_p and dropout_p > 0.0:
         feats = F.dropout(feats, p=dropout_p, training=True)
@@ -153,43 +169,63 @@ def encode_texts(model,
 
 #  main training loop
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train the CLIP-based text clusterer.")
+    parser.add_argument(
+        "--config",
+        required=True,
+        help="Path to the TOML config file with clusterer training parameters.",
+    )
+    return parser.parse_args()
+
+
 def main():
-    random.seed(42)
-    torch.manual_seed(42)
+    args = parse_args()
+    cfg = load_clusterer_config(args.config)
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    random.seed(cfg.seed)
+    torch.manual_seed(cfg.seed)
 
-    hf_path = "data/msrvtt_hf/msrvtt_train" 
-    texts = load_captions_from_arrow(hf_path)
-    print(f"Loaded {len(texts)} captions")
+    requested_device = cfg.device
+    if requested_device == "cuda" and not torch.cuda.is_available():
+        print("CUDA requested but not available; using CPU instead.")
+        device = torch.device("cpu")
+    else:
+        device = torch.device(requested_device)
+
+    hf_path = Path(cfg.dataset_path).expanduser()
+    if not hf_path.exists():
+        raise FileNotFoundError(f"HuggingFace dataset path not found: {hf_path}")
+    texts = load_captions_from_arrow(
+        str(hf_path),
+        max_captions_per_video=cfg.max_captions_per_video,
+        max_texts=cfg.max_texts,
+    )
+    print(f"Loaded {len(texts)} captions from {hf_path}")
 
     dataset = TextCorpusDataset(texts)
     loader = DataLoader(
         dataset,
-        batch_size=32, # change if ur pc can handle more
-        shuffle=True,
-        num_workers=0, # change if ur pc can handle more my laptop can't
+        batch_size=cfg.batch_size,
+        shuffle=cfg.shuffle,
+        num_workers=cfg.num_workers,
         collate_fn=collate_batch,
-        drop_last=True,
+        drop_last=cfg.drop_last,
     )
 
     # load OpenAI CLIP model (text encoder)
-    model, _ = clip.load("ViT-B/32", device=device, jit=False)
-    model.train() 
-
-    # If you only care about text, you can freeze the visual branch:
-    # for name, param in model.named_parameters():
-    #     if "visual" in name:
-    #         param.requires_grad = False
+    model, _ = clip.load(cfg.clip_model_name, device=device, jit=False)
+    model = model.float()  # avoid fp16 overflows while training
+    model.train()
 
     optimizer = optim.AdamW(
         filter(lambda p: p.requires_grad, model.parameters()),
-        lr=1e-5,
-        weight_decay=0.01,
+        lr=cfg.optimizer_lr,
+        weight_decay=cfg.optimizer_weight_decay,
     )
 
-    margin = 0.2 # how far at least apart we want the pos and neg cos dist to be 
-    num_epochs = 1 
+    margin = cfg.margin
+    num_epochs = cfg.num_epochs
 
     for epoch in range(num_epochs):
         running_loss = 0.0
@@ -200,9 +236,9 @@ def main():
             idxs = batch["idxs"]       # [B]
             texts_batch = batch["texts"]
 
-            anchor = encode_texts(model, texts_batch, device)  # Φ_C(x_i, z)
-            # positive with different dropout masks on embeddings 
-            positive = encode_texts(model, texts_batch, device, dropout_p=0.1)  # Φ_C(x_i, z')
+            anchor = encode_texts(model, texts_batch, device, dropout_p=cfg.anchor_dropout)  # Φ_C(x_i, z)
+            # positive with different dropout masks on embeddings
+            positive = encode_texts(model, texts_batch, device, dropout_p=cfg.positive_dropout)  # Φ_C(x_i, z')
 
             # sample random negatives from D \ {x_i}
             neg_texts = []
@@ -214,9 +250,7 @@ def main():
 
             negative = encode_texts(model, neg_texts, device)  # t*_q_i
 
-            loss = triplet_loss(anchor, positive, negative, margin=margin, 
-            debug=True, batch_idx=batch_idx # rm these later when don't want so many prints
-            )
+            loss = triplet_loss(anchor, positive, negative, margin=margin)
 
             optimizer.zero_grad()
             loss.backward()
@@ -230,10 +264,10 @@ def main():
         avg_loss = running_loss / len(loader)
         print(f"Epoch {epoch+1}/{num_epochs} - L_C = {avg_loss:.4f}")
 
-    os.makedirs("checkpoints", exist_ok=True)
-    out_path = "checkpoints/text_clusterer_clip.pt"
-    torch.save(model.state_dict(), out_path)
-    print(f"Saved fine-tuned CLIP text encoder to {out_path}")
+    checkpoint_path = Path(cfg.checkpoint_path).expanduser()
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(model.state_dict(), checkpoint_path)
+    print(f"Saved fine-tuned CLIP text encoder to {checkpoint_path}")
 
 
 if __name__ == "__main__":

@@ -26,6 +26,32 @@ def info_nce_loss(
 
     return (loss_t2v + loss_v2t) / 2.0
 
+def sweeper_loss(
+    sweeper_logits: torch.Tensor,
+    targets: torch.Tensor,
+    label_smoothing: float = 0.0,
+) -> torch.Tensor:
+    """
+    sweeper_logits: (B, K+1, num_segments)
+    targets: (B, K+1)   # int segment index per caption
+    """
+    B, K1, S = sweeper_logits.shape
+    sweeper_logits = sweeper_logits.view(B * K1, S)
+    targets = targets.view(B * K1)
+
+    if label_smoothing > 0.0:
+        # simple label smoothing wrapper
+        with torch.no_grad():
+            true_dist = torch.zeros_like(sweeper_logits)
+            true_dist.fill_(label_smoothing / (S - 1))
+            true_dist.scatter_(1, targets.unsqueeze(1), 1 - label_smoothing)
+        log_probs = F.log_softmax(sweeper_logits, dim=1)
+        loss = -(true_dist * log_probs).sum(dim=1).mean()
+    else:
+        loss = F.cross_entropy(sweeper_logits, targets)
+
+    return loss
+
 def triplet_loss(anchor: torch.Tensor,
                  positive: torch.Tensor,
                  negative: torch.Tensor,
