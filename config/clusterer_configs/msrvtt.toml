@@ -1,0 +1,19 @@
+dataset_path = "assets/datasets/msrvtt_processed/msrvtt_train"
+max_captions_per_video = 1
+max_texts = 3000
+
+batch_size = 8
+shuffle = true
+num_workers = 0
+drop_last = true
+
+clip_model_name = "ViT-B/16"
+optimizer_lr = 1e-5
+optimizer_weight_decay = 0.01
+margin = 0.2
+num_epochs = 1
+positive_dropout = 0.1
+anchor_dropout = 0.1
+checkpoint_path = "assets/checkpoints/text_clusterer_clip.pt"
+device = "cuda"
+seed = 42

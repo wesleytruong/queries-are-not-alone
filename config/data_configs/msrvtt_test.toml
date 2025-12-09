@@ -1,8 +1,8 @@
-out_dir = "assets/datasets/msrvtt_processed"
+out_dir = "assets/datasets/msrvtt_processed_test"
 dataset_tag = "msrvtt"
 dataset_name = "friedrichor/MSR-VTT"
-dataset_config = "train_9k"
-split = "train"
+dataset_config = "test_1k"
+split = "test"
 
 num_frames = 8
 resize = 224
@@ -15,7 +15,7 @@ video_root = "assets/datasets/msrvtt_raw/video"
 video_ext = ".mp4"
 
 # joint preprocessing
-joint_out_dir = "assets/datasets/msrvtt_joint_preprocessed"
+joint_out_dir = "assets/datasets/msrvtt_joint_preprocessed_test"
 joint_text_checkpoint = "checkpoints/text_clusterer_clip.pt"
 joint_k = 5
 joint_clip_model = "ViT-B/16"

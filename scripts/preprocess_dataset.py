@@ -1,10 +1,9 @@
-# scripts/preprocess_dataset.py
 import argparse
 import os
 from pathlib import Path
 from typing import Dict, Any, Iterator, List
 
-from config.data_config import load_config
+from config import load_data_config
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
@@ -73,7 +72,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    cfg = load_config(args.config)
+    cfg = load_data_config(args.config)
 
     os.makedirs(cfg.out_dir, exist_ok=True)
     if not cfg.video_root:
