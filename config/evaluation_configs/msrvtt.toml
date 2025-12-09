@@ -1,0 +1,8 @@
+train_config = "config/data_configs/msrvtt.toml"
+test_config = "config/data_configs/msrvtt_test.toml"
+checkpoint = "assets/checkpoints/retrieval_model.pt"
+
+k = 5
+text_batch_size = 256
+use_faiss_gpu = false
+device = "cuda"
