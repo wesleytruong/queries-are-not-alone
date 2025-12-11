@@ -10,7 +10,9 @@ Repository for reproducing the results of the paper
 Our project currently targets MSR-VTT by default.
 
 ```bash
-# If not installed, install your machine's version of PyTorch and ensure ffmpeg is installed on the machine
+# If not installed, install PyTorch and ensure ffmpeg is installed on the machine
+# PyTorch: https://pytorch.org/get-started/locally/
+# Install uv: https://docs.astral.sh/uv/getting-started/installation/
 # sync packages and activate venv
 uv sync
 uv pip install -e .
