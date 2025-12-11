@@ -7,7 +7,8 @@ Repository for reproducing the results of the paper
 
 ## Reproducability
 
-Our project currently targets MSR-VTT by default.
+Our project currently targets [MSR-VTT][https://huggingface.co/datasets/friedrichor/MSR-VTT] by default.
+
 
 ```bash
 # If not installed, install PyTorch and ensure ffmpeg is installed on the machine
