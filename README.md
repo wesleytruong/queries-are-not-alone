@@ -8,7 +8,7 @@ Repository for reproducing the results of the paper
 
 ## Reproducability
 
-Our project currently targets [MSR-VTT][https://huggingface.co/datasets/friedrichor/MSR-VTT] by default.
+Our project currently targets [MSR-VTT](https://huggingface.co/datasets/friedrichor/MSR-VTT) by default.
 This dataset contains videos from ~20 categories and has 20 sentences per video through AMT. 
 
 The data preprocessing is done under /scripts/preprocess_dataset.py and scripts/preprocess_joint_dataset.py, and all models are defined under /models. The configurations are written per script under /configs for ease of editing hyperparameters and any models required. 
