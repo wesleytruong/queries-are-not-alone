@@ -17,17 +17,23 @@ Our project currently targets MSR-VTT by default.
 uv sync
 uv pip install -e .
 source ./.venv/bin/activate
+
 # Download and unzip dataset files
 python scripts/download_msrvtt.py
+
 # Preprocess video files into sampled frames + captions
 python ./scripts/preprocess_dataset.py --config ./config/data_configs/msrvtt.toml
 python ./scripts/preprocess_dataset.py --config ./config/data_configs/msrvtt_test.toml
+
 # train text clusterer
 python ./scripts/train_clusterer.py --config ./config/clusterer_configs/msrvtt.toml
+
 # precompute knn clusters for joint training and preprocess text and frame embeddings
 python ./scripts/preprocess_joint_dataset.py --config ./config/data_configs/msrvtt.toml
+
 # perform joint training on sweeper, vtc_attention, and text-video fusion layer
 python ./scripts/train_joint.py --config ./config/joint_configs/msrvtt.toml
+
 # perform evaluation script on msrvtt test set
 python ./scripts/evaluate_retrieval.py --config ./config/evaluation_configs/msrvtt.toml
 ```
