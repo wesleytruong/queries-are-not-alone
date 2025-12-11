@@ -1,4 +1,5 @@
 # queries-are-not-alone
+Repo Authors: Wesley Truong and Adyah Rastogi 
 
 Repository for reproducing the results of the paper 
 **“Queries Are Not Alone: Clustering Text Embeddings for Video Search”** by Peiyang Liu, Xi Wang, Ziqiang Cui, Wei Ye.  
@@ -8,7 +9,10 @@ Repository for reproducing the results of the paper
 ## Reproducability
 
 Our project currently targets [MSR-VTT][https://huggingface.co/datasets/friedrichor/MSR-VTT] by default.
+This dataset contains videos from ~20 categories and has 20 sentences per video through AMT. 
 
+The data preprocessing is done under /scripts/preprocess_dataset.py and scripts/preprocess_joint_dataset.py, and all models are defined under /models. The configurations are written per script under /configs for ease of editing hyperparameters and any models required. 
+We also use the openai-clip package, specifically using the CLIP-ViT-B/16 model by default.
 
 ```bash
 # If not installed, install PyTorch and ensure ffmpeg is installed on the machine
@@ -46,3 +50,5 @@ python ./scripts/evaluate_retrieval.py --config ./config/evaluation_configs/msrv
 | 1 | 0.5230 | 0.7620 | 0.8300 |
 | 2 | 0.5040 | 0.7530 | 0.8310 |
 | 3 | 0.5580 | 0.7580 | 0.8150 |
+
+Text-to-video retrieval results on MSRVTT using CLIP-ViT-B/16
