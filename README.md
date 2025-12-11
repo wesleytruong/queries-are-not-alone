@@ -10,6 +10,7 @@ Repository for reproducing the results of the paper
 Our project currently targets MSR-VTT by default.
 
 ```bash
+# If not installed, install your machine's version of PyTorch and ensure ffmpeg is installed on the machine
 # sync packages and activate venv
 uv sync
 uv pip install -e .
@@ -24,7 +25,7 @@ python ./scripts/train_clusterer.py --config ./config/clusterer_configs/msrvtt.t
 # precompute knn clusters for joint training and preprocess text and frame embeddings
 python ./scripts/preprocess_joint_dataset.py --config ./config/data_configs/msrvtt.toml
 # perform joint training on sweeper, vtc_attention, and text-video fusion layer
-python ./scripts/train_joint.py --config ./config/data_configs/msrvtt.toml
+python ./scripts/train_joint.py --config ./config/joint_configs/msrvtt.toml
 # perform evaluation script on msrvtt test set
 python ./scripts/evaluate_retrieval.py --config ./config/evaluation_configs/msrvtt.toml
 ```
