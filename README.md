@@ -14,7 +14,7 @@ This dataset contains videos from ~20 categories and has 20 sentences per video 
 The data preprocessing is done under /scripts/preprocess_dataset.py and scripts/preprocess_joint_dataset.py, and all models are defined under /models. The configurations are written per script under /configs for ease of editing hyperparameters and any models required. 
 We also use the openai-clip package, specifically using the CLIP-ViT-B/16 model by default.
 
-More detailed explanation of our reproduction is in our [report](https://github.com/wesleytruong/queries-are-not-alone/blob/main/Reproduction%20Paper.pdf).
+More detailed explanation of our reproduction is in our [report](https://github.com/wesleytruong/queries-are-not-alone/blob/main/Queries%20Are%20Not%20Alone%20Reproduction%20Paper.pdf).
 
 ```bash
 # If not installed, install PyTorch and ensure ffmpeg is installed on the machine
